@@ -75,18 +75,8 @@ function getMostWanted($alpha)
 				$item['charge'] = trim($bioinfo[6]);
 				$item['judge'] = trim($bioinfo[7]);
 			}
+			$items[] = $item;
 		}
-		else
-		{
-			$item['name'] = '';
-			$item['address'] = '';
-			$item['vitals1'] = '';
-			$item['vitals2'] = '';
-			$item['wanted-by'] = '';
-			$item['charge'] = '';
-			$item['judge'] = '';
-		}
-		$items[] = $item;
 	}
 	return $items;
 }
@@ -96,7 +86,6 @@ function getMostWanted($alpha)
 $most_wanted = array();
 for ($alpha = ord('a'); $alpha <= ord('z'); $alpha++)
 {
-	echo chr($alpha);
 	$data = getMostWanted(chr($alpha));
 	$most_wanted = array_merge($most_wanted, $data);
 }
