@@ -45,7 +45,6 @@ function getMostWanted($alpha)
 		// The image
 		if (strpos(strtolower($match), '<span>no image available</span>') === false)
 		{
-			$img_url = '';
 			if (preg_match('/<img src="([\w\d.\/]+)"\s\/>/', $match, $img_url_data) === 1)
 			{
 				$item['image'] = $base_url . '/' . $img_url_data[1];
