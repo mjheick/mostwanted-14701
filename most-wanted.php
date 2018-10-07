@@ -33,8 +33,6 @@ function getMostWanted($alpha)
 
 	// https://regexr.com for awesome regex matching
 	preg_match_all('/<tr[\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?<>]*?<\/tr>/', $data, $matches);
-//  \s\w\d\r\n\-\'\(\)\/=":#;,.<>
-//	\s\w\d\r\n\'\[\]\\\-\/|!@#$%^&*()_+={};:",.?<>
 	foreach($matches[0] as $match)
 	{
 		$item = array();
@@ -93,5 +91,14 @@ function getMostWanted($alpha)
 	return $items;
 }
 
-$d = getMostWanted("r");
-print_r($d);
+
+// Get most wanted, A to Z
+$most_wanted = array();
+for ($alpha = ord('a'); $alpha <= ord('z'); $alpha++)
+{
+	echo chr($alpha);
+	$data = getMostWanted(chr($alpha));
+	$most_wanted = array_merge($most_wanted, $data);
+}
+
+print_r($most_wanted);
