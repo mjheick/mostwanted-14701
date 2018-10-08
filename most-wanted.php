@@ -66,6 +66,7 @@ function getMostWanted($alpha)
 			// our "data"-catchall regex for information presented: \s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?
 			if (preg_match('/([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br><br>[\w\s:]+<br>([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br>([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br>([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br><br>Wanted By:([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br>Charge:([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br>([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)/', $data[1], $bioinfo) === 1)
 			{
+				$item['source-url'] = $base_url . '/' . $alpha . '.aspx';
 				$item['name'] = trim($bioinfo[1]);
 				$item['address'] = trim($bioinfo[2]);
 				$item['vitals1'] = trim($bioinfo[3]);
@@ -82,11 +83,34 @@ function getMostWanted($alpha)
 
 
 // Get most wanted, A to Z
-$most_wanted = array();
+$most_wanted_all = array();
 for ($alpha = ord('a'); $alpha <= ord('z'); $alpha++)
 {
 	$data = getMostWanted(chr($alpha));
-	$most_wanted = array_merge($most_wanted, $data);
+	$most_wanted_all = array_merge($most_wanted_all, $data);
+}
+
+// there are scenarios where a person might have multple charges. Lets sort that all out
+$most_wanted = array();
+foreach ($most_wanted_all as $item)
+{
+	$person_hash = hash('sha256', $item['image'] . $item['name']);
+	if (array_key_exists($person_hash, $most_wanted))
+	{
+		// if it's not an array, make it an array
+		if (!is_array($most_wanted[$person_hash]['charge']))
+		{
+			$charge_temp = $most_wanted[$person_hash]['charge'];
+			$most_wanted[$person_hash]['charge'] = array();
+			$most_wanted[$person_hash]['charge'][] = $charge_temp;
+		}
+		$most_wanted[$person_hash]['charge'][] = $item['charge'];
+	}
+	else
+	{
+		$most_wanted[$person_hash] = $item;
+	}
 }
 
 print_r($most_wanted);
+echo serialize($most_wanted);
