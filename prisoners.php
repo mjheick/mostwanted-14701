@@ -33,20 +33,6 @@ function getPrisoners()
 	preg_match_all('/<tr[\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?<>]*?<\/tr>/', $data, $matches);
 	foreach($matches[0] as $prisoner)
 	{
-		/**
-		 * Standard Table Row for this element:
-		 <tr style="background-color:#EFF3FB;">
-			<td align="left" valign="middle" style="background-color:Red;">
-           <div style="position:relative; left:0; top:0;">
-              <img id="GridView1_Image1_0" onerror="this.onload = null; this.src=&#39;../images/NOPIC.jpg&#39;;" src="mugs/0CK1TQY2.jpg" style="width:250px;" />
-
-              <div style="text-align:left; position:bottom; left:0px; top:0px; font-size:11px; font-family:Verdana; color:#ffffff; width:100%; height:100%;">          
-              <span id="GridView1_subject_0" style="display:inline-block;width:250px;">Jordan T Adams Age: 32<br>Booked: 9/23/2018 11:23:12 AM<br>Cat: Felony<br>Bail: $25,000.00 MFN: 38667</span>
-               </div>
-                        </div>
-          </td>
-		</tr>
-		 */
 		$item = array();
 		// the image for the prisoner
 		if (preg_match('/<img[\d\s\w\/=":;#&.]+src="([\d\w.\/:;]+)"[\d\s\w\/=":;#&.]+\/>/', $prisoner, $data) === 1)
