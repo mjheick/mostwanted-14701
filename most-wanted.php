@@ -1,5 +1,8 @@
 <?php
-
+require_once('FBLogin.php');
+$link = mysqli_connect('localhost', 'root', 'password', 'chautauqua_sheriff.us');
+if (!$link) { die('badness in the connection of the computer datin base'); }
+$p = new FBLogin();
 
 /**
  * Data resides at http[s]://findour.info/[a-z].aspx
@@ -64,7 +67,7 @@ function getMostWanted($alpha)
 		{
 			// we can be quite specific in this, as they use <br>'s to separate out their data.
 			// our "data"-catchall regex for information presented: \s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?
-			if (preg_match('/([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br><br>[\w\s:]+<br>([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br>([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br>([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br><br>Wanted By:([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br>Charge:([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)<br>([\s\w\d\r\n\'\[\]\/\-|!@#$%^&*()_+={};:",.?]+)/', $data[1], $bioinfo) === 1)
+			if (preg_match('/([\s\w\d\r\n\'\[\]\/\-<>|!@#$%^&*()_+={};:",.?]+)<br><br>[\w\s:]+<br>([\s\w\d\r\n\'\[\]\/\-<>|!@#$%^&*()_+={};:",.?]+)<br>([\s\w\d\r\n\'\[\]\/\-<>|!@#$%^&*()_+={};:",.?]+)<br>([\s\w\d\r\n\'\[\]\/\-<>|!@#$%^&*()_+={};:",.?]+)<br><br>Wanted By:([\s\w\d\r\n\'\[\]\/\-<>|!@#$%^&*()_+={};:",.?]+)<br>Charge:([\s\w\d\r\n\'\[\]\/\-<>|!@#$%^&*()_+={};:",.?]+)<br>([\s\w\d\r\n\'\[\]\/\-<>|!@#$%^&*()_+={};:",.?]+)/', $data[1], $bioinfo) === 1)
 			{
 				$item['source-url'] = $base_url . '/' . $alpha . '.aspx';
 				$item['name'] = trim($bioinfo[1]);
@@ -90,27 +93,118 @@ for ($alpha = ord('a'); $alpha <= ord('z'); $alpha++)
 	$most_wanted_all = array_merge($most_wanted_all, $data);
 }
 
-// there are scenarios where a person might have multple charges. Lets sort that all out
-$most_wanted = array();
+// load it up in the database, yo
 foreach ($most_wanted_all as $item)
 {
-	$person_hash = hash('sha256', $item['image'] . $item['name']);
-	if (array_key_exists($person_hash, $most_wanted))
+	// so we can group it all together
+	$guid = hash('sha256', $item['image'] . $item['name']);
+	$uid = hash('sha256', $item['image'] . $item['source-url'] . $item['name'] . $item['address'] . $item['vitals1'] . $item['vitals2'] . $item['wanted-by'] . $item['charge'] . $item['charge']);
+	// see if the uid exists
+	$query = "SELECT * FROM `most-wanted` WHERE `uid`='$uid' LIMIT 1";
+	$res = mysqli_query($link, $query);
+	if (mysqli_num_rows($res) == 0)
 	{
-		// if it's not an array, make it an array
-		if (!is_array($most_wanted[$person_hash]['charge']))
-		{
-			$charge_temp = $most_wanted[$person_hash]['charge'];
-			$most_wanted[$person_hash]['charge'] = array();
-			$most_wanted[$person_hash]['charge'][] = $charge_temp;
-		}
-		$most_wanted[$person_hash]['charge'][] = $item['charge'];
+		// insert posting to computer datin base
+		$query = "INSERT INTO `most-wanted` (`guid`, `uid`, `image`, `source-url`, `name`, `address`, `vitals1`, `vitals2`, `wanted-by`, `charge`, `judge`, `added`, `lastseen`) VALUES ("
+		. "'" . mysqli_real_escape_string($link, $guid) . "', "
+		. "'" . mysqli_real_escape_string($link, $uid) . "', "
+		. "'" . mysqli_real_escape_string($link, $item['image']) . "', "
+		. "'" . mysqli_real_escape_string($link, $item['source-url']) . "', "
+		. "'" . mysqli_real_escape_string($link, $item['name']) . "', "
+		. "'" . mysqli_real_escape_string($link, $item['address']) . "', "
+		. "'" . mysqli_real_escape_string($link, $item['vitals1']) . "', "
+		. "'" . mysqli_real_escape_string($link, $item['vitals2']) . "', "
+		. "'" . mysqli_real_escape_string($link, $item['wanted-by']) . "', "
+		. "'" . mysqli_real_escape_string($link, $item['charge']) . "', "
+		. "'" . mysqli_real_escape_string($link, $item['judge']) . "', "
+		. "NOW(), "
+		. "NOW()"
+		. ")";
+		mysqli_query($link, $query);
 	}
 	else
 	{
-		$most_wanted[$person_hash] = $item;
+		$query = "UPDATE `most-wanted` SET `lastseen`=NOW() WHERE `guid`='" . mysqli_real_escape_string($link, $guid) . "' LIMIT 1";
+		mysqli_query($link, $query);
 	}
 }
 
-print_r($most_wanted);
-echo serialize($most_wanted);
+// ask the database if there is anything, by GUID
+$query = "SELECT DISTINCT `guid` FROM `most-wanted` WHERE `posted`='0000-00-00 00:00:00'";
+$res = mysqli_query($link, $query);
+while ($guid = mysqli_fetch_assoc($res))
+{
+	// This should exist on every iteration
+	$guid_query = "SELECT * FROM `most-wanted` WHERE `guid`='" . $guid['guid'] . "' AND `posted`='0000-00-00 00:00:00' LIMIT 1";
+	$guid_res = mysqli_query($link, $guid_query);
+	$data = mysqli_fetch_assoc($guid_res);
+
+	$canpost = false; // check if we have some qualifications to post
+	// all these guids, we need to re-ask if there are matching charges to compile up. in the meantime, lets get the basics taken care of
+
+	if (strlen(trim($data['image'])) > 0)
+	{
+		// find out if image exists
+		$ch = curl_init($data['image']);
+		curl_setopt($ch, CURLOPT_HEADER, true);
+		curl_setopt($ch, CURLOPT_NOBODY, true);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+		$output = curl_exec($ch);
+		$httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		curl_close($ch);
+		if ($httpcode != "404")
+		{
+			$canpost = true;
+		}
+	}
+	else
+	{
+		$canpost = true;
+	}
+
+	if ($canpost)
+	{
+		echo "most-wanted:Posting:" . $data['name'] . "[" . $guid['guid'] . "]:";
+
+		$message = "";
+		$message .= "Wanted: " . $data['name'] . "\n\n";
+		$message .= "Last known address: " . $data['address'] . "\n";
+		$message .= $data['vitals1'] . "\n" . $data['vitals2'] . "\n\n";
+		$message .= "Wanted by: " . $data['wanted-by'] . "\n";
+		// lets see if there are 1 or more charges
+		$subquery = "SELECT `charge` FROM `most-wanted` WHERE `guid`='" . $data['guid'] . "' AND `posted`='0000-00-00 00:00:00'";
+		$subres = mysqli_query($link, $subquery);
+		if (mysqli_num_rows($subres) == 1)
+		{
+			// use the charge from the previous query
+			$message .= "Charge: " . $data['charge'] . "\n";
+		}
+		else
+		{
+			$message .= "Charges:\n";
+			// enumerate through all the charges and append them together
+			while ($subdata = mysqli_fetch_assoc($subres))
+			{
+				$message .= "- " . $subdata['charge'] . "\n";
+			}
+		}
+
+		// if we got an image thats present, use it. else, use the URI
+		if (strlen(trim($data['image'])) > 0)
+		{
+			$message .= "\n" . $data['image'];
+		}
+		else
+		{
+			$message .= "\n" . $data['source-url'];
+		}
+		
+		$d = $p->forumPost($message);
+		
+		$query = "UPDATE `most-wanted` SET `posted`=NOW() WHERE `guid`='" . $data['guid'] . "' AND `posted`='0000-00-00 00:00:00'";
+		mysqli_query($link, $query);
+		echo "Ok\n";
+	}
+}
+mysqli_close($link);

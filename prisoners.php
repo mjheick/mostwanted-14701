@@ -1,4 +1,8 @@
 <?php
+require_once('FBLogin.php');
+$link = mysqli_connect('localhost', 'root', 'password', 'chautauqua_sheriff.us');
+if (!$link) { die('badness in the connection of the computer datin base'); }
+$p = new FBLogin();
 
 /**
  * Data resides at http[s]://findour.info/ccj.aspx
@@ -53,11 +57,84 @@ function getPrisoners()
 			$item['category'] = $data[4];
 			$item['bail'] = $data[5];
 			$item['mfn'] = $data[6];
+			$idx = hash('sha256', $item['image'] . $item['name'] . $item['age'] . $item['booked'] . $item['category'] . $item['bail'] . $item['mfn']);
+			$prisoners[$idx] = $item;
 		}
-		$prisoners[] = $item;
 	}
 	return $prisoners;
 }
 
+// get some data
 $prisoners = getPrisoners();
-print_r($prisoners);
+
+if (count($prisoners) > 0) // Do we have data from getPrisoners()?
+{
+	foreach ($prisoners as $key => $data)
+	{
+		$query = "SELECT * FROM `prisoner` WHERE `guid`='$key' LIMIT 1";
+		$res = mysqli_query($link, $query);
+		if (mysqli_num_rows($res) == 0)
+		{
+			// insert posting to computer datin base
+			$query = "INSERT INTO `prisoner` (`guid`, `image`, `name`, `age`, `when_booked`, `category`, `bail`, `mfn`, `added`, `lastseen`) VALUES ("
+			. "'" . mysqli_real_escape_string($link, $key) . "', "
+			. "'" . mysqli_real_escape_string($link, $data['image']) . "', "
+			. "'" . mysqli_real_escape_string($link, $data['name']) . "', "
+			. "'" . mysqli_real_escape_string($link, $data['age']) . "', "
+			. "'" . mysqli_real_escape_string($link, $data['booked']) . "', "
+			. "'" . mysqli_real_escape_string($link, $data['category']) . "', "
+			. "'" . mysqli_real_escape_string($link, $data['bail']) . "', "
+			. "'" . mysqli_real_escape_string($link, $data['mfn']) . "', "
+			. "NOW(), "
+			. "NOW()"
+			. ")";
+			mysqli_query($link, $query);
+		}
+		else
+		{
+			$query = "UPDATE `prisoner` SET `lastseen`=NOW() WHERE `guid`='" . mysqli_real_escape_string($link, $key) . "' LIMIT 1";
+			mysqli_query($link, $query);
+		}
+	}
+}
+
+$query = "SELECT * FROM `prisoner` WHERE `posted`='0000-00-00 00:00:00'";
+$res = mysqli_query($link, $query);
+while ($item = mysqli_fetch_assoc($res))
+{
+	// find out if image exists
+	$ch = curl_init($item['image']);
+	curl_setopt($ch, CURLOPT_HEADER, true);
+	curl_setopt($ch, CURLOPT_NOBODY, true);
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+	curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+	$output = curl_exec($ch);
+	$httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+	curl_close($ch);
+	if ($httpcode != "404")
+	{
+		echo "Posting: $key ";
+		echo "prisoners:Posting:" . $item['name'] . "[" . $item['guid'] . "]:";
+		$message = "";
+		$message .= "Welcome " . $item['name'] . " to Jail!\n\n";
+		$message .= "They were booked in on " . $item['when_booked'];
+		if (($item['category'] != 'Unspecified') && ($item['category'] != 'unknown'))
+		{
+			$message .= ", accused of a " . $item['category'];
+		}
+		if ($item['bail'] == '$0.00') // cause Jake said so
+		{
+			$message .= " with no bail";
+		} else {
+			$message .= " with a bail of " . $item['bail'];
+		}
+		$message .= "\n\n" . $item['image'];
+	
+		$d = $p->forumPost($message);
+
+		$query = "UPDATE `prisoner` SET `posted`=NOW() WHERE `guid`='" . $item['guid'] . "' LIMIT 1";
+		mysqli_query($link, $query);
+		echo "Ok\n";
+	}
+}
+mysqli_close($link);
