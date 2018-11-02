@@ -69,7 +69,7 @@ class FBLogin
 			'VARS' => array(),
 		);
 		$m = array();
-		if (preg_match('/<form method="post" action="(\/composer\/mbasic\/.*?)">/', $data, $m) === 0)
+		if (preg_match('/<form method="post" action="(\/composer\/mbasic\/.*?)"/', $data, $m) === 0)
 		{
 			die('error(' . __FUNCTION__ . '): form post is not parseable');
 		}
